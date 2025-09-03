@@ -1,0 +1,1840 @@
+
+<!DOCTYPE html>
+<html lang="en">
+
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Architecture of Understanding: A Deep Dive into Large Language Models</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Tiempos+Headline:wght@400;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #1e293b;
+            --secondary: #64748b;
+            --accent: #0f172a;
+            --surface: #f8fafc;
+            --muted: #94a3b8;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            line-height: 1.7;
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+        }
+        
+        .serif-heading {
+            font-family: 'Tiempos Headline', serif;
+        }
+        
+        .hero-gradient {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+        }
+        
+        .math-formula {
+            background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+            border-left: 4px solid #64748b;
+        }
+        
+        .toc-link {
+            transition: all 0.3s ease;
+        }
+        
+        .toc-link:hover {
+            background-color: #f1f5f9;
+            padding-left: 1rem;
+        }
+        
+        .toc-link.active {
+            background-color: #e2e8f0;
+            border-left: 3px solid #64748b;
+            padding-left: 0.75rem;
+        }
+        
+        .code-block {
+            background: #1e293b;
+            color: #f8fafc;
+            font-family: 'Monaco', 'Menlo', monospace;
+        }
+        
+        .citation-link {
+            color: #64748b;
+            text-decoration: none;
+            font-size: 0.875rem;
+            vertical-align: super;
+            padding: 0 2px;
+        }
+        
+        .citation-link:hover {
+            color: #334155;
+        }
+        
+        .bento-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            grid-template-rows: auto auto;
+            gap: 1.5rem;
+        }
+        
+        .bento-main {
+            grid-row: 1 / -1;
+        }
+        
+        @media (max-width: 768px) {
+            .bento-grid {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto;
+            }
+            
+            .bento-main {
+                grid-row: auto;
+            }
+        }
+    </style>
+  </head>
+
+  <body class="text-slate-800">
+    <!-- Fixed Table of Contents -->
+    <nav class="fixed left-0 top-0 h-screen w-72 bg-white shadow-lg z-40 overflow-y-auto border-r border-slate-200">
+      <div class="p-6">
+        <h3 class="serif-heading text-lg font-bold text-slate-900 mb-4">Contents</h3>
+        <ul class="space-y-2 text-sm">
+          <li>
+            <a href="#executive-summary" class="toc-link block py-2 px-3 rounded-md text-slate-700 hover:text-slate-900">Executive Summary</a>
+          </li>
+          <li>
+            <a href="#tutorial-1" class="toc-link block py-2 px-3 rounded-md text-slate-700 hover:text-slate-900">1. Building Blocks: Tokens & Embeddings</a>
+            <ul class="ml-4 mt-2 space-y-1">
+              <li>
+                <a href="#tokenization" class="toc-link block py-1 px-3 text-xs text-slate-600 hover:text-slate-800">Tokenization</a>
+              </li>
+              <li>
+                <a href="#embeddings" class="toc-link block py-1 px-3 text-xs text-slate-600 hover:text-slate-800">Embeddings</a>
+              </li>
+            </ul>
+          </li>
+          <li>
+            <a href="#tutorial-2" class="toc-link block py-2 px-3 rounded-md text-slate-700 hover:text-slate-900">2. Positional Embeddings</a>
+            <ul class="ml-4 mt-2 space-y-1">
+              <li>
+                <a href="#absolute-pe" class="toc-link block py-1 px-3 text-xs text-slate-600 hover:text-slate-800">Absolute PE</a>
+              </li>
+              <li>
+                <a href="#rope" class="toc-link block py-1 px-3 text-xs text-slate-600 hover:text-slate-800">RoPE</a>
+              </li>
+              <li>
+                <a href="#alibi" class="toc-link block py-1 px-3 text-xs text-slate-600 hover:text-slate-800">ALiBi</a>
+              </li>
+            </ul>
+          </li>
+          <li>
+            <a href="#tutorial-3" class="toc-link block py-2 px-3 rounded-md text-slate-700 hover:text-slate-900">3. Self-Attention & Multi-Head</a>
+          </li>
+          <li>
+            <a href="#tutorial-4" class="toc-link block py-2 px-3 rounded-md text-slate-700 hover:text-slate-900">4. Transformer Architecture</a>
+          </li>
+          <li>
+            <a href="#tutorial-5" class="toc-link block py-2 px-3 rounded-md text-slate-700 hover:text-slate-900">5. Text Generation & Inference</a>
+          </li>
+          <li>
+            <a href="#tutorial-6" class="toc-link block py-2 px-3 rounded-md text-slate-700 hover:text-slate-900">6. Advanced Architectures</a>
+            <ul class="ml-4 mt-2 space-y-1">
+              <li>
+                <a href="#moe" class="toc-link block py-1 px-3 text-xs text-slate-600 hover:text-slate-800">Mixture of Experts</a>
+              </li>
+              <li>
+                <a href="#gqa" class="toc-link block py-1 px-3 text-xs text-slate-600 hover:text-slate-800">Grouped Query Attention</a>
+              </li>
+            </ul>
+          </li>
+          <li>
+            <a href="#tutorial-7" class="toc-link block py-2 px-3 rounded-md text-slate-700 hover:text-slate-900">7. Training & Fine-Tuning</a>
+          </li>
+          <li>
+            <a href="#tutorial-8" class="toc-link block py-2 px-3 rounded-md text-slate-700 hover:text-slate-900">8. Scaling & Optimization</a>
+          </li>
+        </ul>
+      </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="ml-72 min-h-screen">
+      <!-- Hero Section -->
+      <section class="hero-gradient text-white relative overflow-hidden">
+        <div class="absolute inset-0 opacity-20">
+          <img src="https://kimi-img.moonshot.cn/pub/icon/spinner.svg" alt="Abstract neural network visualization with interconnected nodes" class="w-full h-full object-cover" size="wallpaper" aspect="wide" query="abstract neural network visualization" referrerpolicy="no-referrer" />
+        </div>
+        <div class="relative z-10 px-12 py-16">
+          <div class="bento-grid max-w-7xl mx-auto">
+            <div class="bento-main">
+              <h1 class="serif-heading text-4xl sm:text-5xl md:text-6xl font-bold leading-tight mb-6">
+                <span class="italic">The Architecture</span>
+                <br>
+                <span class="text-slate-300">of Understanding</span>
+              </h1>
+              <p class="text-xl text-slate-300 max-w-3xl leading-relaxed">
+                A comprehensive journey through the fundamental mechanisms that power Large Language Models, from tokenization to trillion-parameter architectures.
+              </p>
+            </div>
+            <div class="space-y-4">
+              <div class="bg-white/10 backdrop-blur rounded-lg p-4">
+                <h3 class="font-semibold text-sm uppercase tracking-wide mb-2">Key Concepts</h3>
+                <ul class="text-sm space-y-1 text-slate-300">
+                  <li>• Transformers & Attention</li>
+                  <li>• Embeddings & Positional Encoding</li>
+                  <li>• Mixture of Experts</li>
+                  <li>• Training at Scale</li>
+                </ul>
+              </div>
+              <div class="bg-white/10 backdrop-blur rounded-lg p-4">
+                <h3 class="font-semibold text-sm uppercase tracking-wide mb-2">Architecture Focus</h3>
+                <p class="text-sm text-slate-300">GPT, Qwen, and state-of-the-art LLM implementations</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Executive Summary -->
+      <section id="executive-summary" class="px-12 py-16 bg-white">
+        <div class="max-w-4xl mx-auto">
+          <h2 class="serif-heading text-3xl font-bold text-slate-900 mb-8">Executive Summary</h2>
+          <div class="prose prose-lg max-w-none">
+            <p class="text-xl text-slate-700 leading-relaxed mb-6">
+              Large Language Models (LLMs) like GPT and Qwen are complex systems built on a foundation of relatively simple concepts. At their core, they convert text into numerical representations (tokens and embeddings), understand the order of words using positional encodings, and use a mechanism called self-attention to weigh the importance of different words in a sentence.
+            </p>
+            <p class="text-slate-700 leading-relaxed mb-6">
+              These components are assembled into a deep architecture called a Transformer. During text generation, the model uses sampling techniques to choose the next word and employs optimizations like a KV cache to make the process fast and efficient. Advanced techniques like Mixture of Experts (MoE) and Grouped Query Attention (GQA) further enhance performance and efficiency, while methods like quantization make these large models more accessible.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tutorial 1: Tokens and Embeddings -->
+      <section id="tutorial-1" class="px-12 py-16 bg-slate-50">
+        <div class="max-w-4xl mx-auto">
+          <h2 class="serif-heading text-4xl font-bold text-slate-900 mb-8">Tutorial 1: The Building Blocks of Language for Models</h2>
+
+          <div id="tokenization" class="mb-12">
+            <h3 class="serif-heading text-2xl font-semibold text-slate-800 mb-6">Tokenization: Converting Text to Numbers</h3>
+            <p class="text-slate-700 leading-relaxed mb-6">
+              Tokenization is the foundational first step in enabling a machine learning model to process human language. Since models operate on numerical data, every piece of text must be broken down into smaller, discrete units called <strong>tokens</strong>. These tokens can represent words, subwords, or even individual characters.
+              <a href="https://towardsdatascience.com/positional-embeddings-in-transformers-a-math-guide-to-rope-alibi/" class="citation-link">[148]</a>
+            </p>
+
+            <div class="bg-white rounded-lg p-6 shadow-sm border border-slate-200 mb-6">
+              <h4 class="font-semibold text-slate-800 mb-4">Understanding Subword Tokenization</h4>
+              <p class="text-slate-700 leading-relaxed mb-4">
+                Subword tokenization bridges the gap between word-level and character-level approaches. The core idea is to represent words as sequences of smaller, meaningful units. For example, "tokenization" might be represented as
+                <code>["token", "ization"]</code>.
+              </p>
+
+              <div class="code-block rounded-lg p-4 overflow-x-auto mb-4">
+                <pre class="text-sm"><code>class SimpleTokenizer:
+    def __init__(self, text):
+        # Create a sorted list of unique characters in the text
+        chars = sorted(list(set(text)))
+        # Create mappings from character to index and index to character
+        self.stoi = {ch: i for i, ch in enumerate(chars)}
+        self.itos = {i: ch for ch, i in self.stoi.items()}
+        self.vocab_size = len(self.stoi)
+
+    def encode(self, text):
+        """Encodes a string into a list of character IDs."""
+        return [self.stoi[c] for c in text]
+
+    def decode(self, ids):
+        """Decodes a list of character IDs into a string."""
+        return ''.join([self.itos[i] for i in ids])</code></pre>
+              </div>
+            </div>
+          </div>
+
+          <div id="embeddings" class="mb-12">
+            <h3 class="serif-heading text-2xl font-semibold text-slate-800 mb-6">Embeddings: Giving Meaning to Tokens</h3>
+            <p class="text-slate-700 leading-relaxed mb-6">
+              Once text has been tokenized, the next step is to transform these discrete tokens into continuous vector representations. This process is called <strong>embedding</strong>. The core idea is to map each token from a high-dimensional, sparse space to a lower-dimensional, dense vector space that captures semantic and syntactic relationships.
+            </p>
+
+            <div class="math-formula p-6 rounded-lg mb-6">
+              <h4 class="font-semibold text-slate-800 mb-3">Mathematical Formulation</h4>
+              <p class="text-slate-700 mb-2">Given a vocabulary size V and embedding dimension d:</p>
+              <code class="text-lg">Embedding: ℤ → ℝᵈ</code>
+              <p class="text-sm text-slate-600 mt-2">Where each token ID is mapped to a d-dimensional vector</p>
+            </div>
+
+            <div class="code-block rounded-lg p-4 overflow-x-auto">
+              <pre class="text-sm"><code>import torch
+import torch.nn as nn
+
+# Define vocabulary size and embedding dimension
+vocab_size = 8  # From our SimpleTokenizer example
+embedding_dim = 5
+
+# Create the embedding layer
+embedding_layer = nn.Embedding(vocab_size, embedding_dim)
+
+# Example input: token IDs for "hello"
+input_ids = torch.tensor([[3, 2, 4, 4, 5]])
+
+# Pass the token IDs through the embedding layer
+embedded = embedding_layer(input_ids)
+
+print(f"Input IDs shape: {input_ids.shape}")
+print(f"Embedded shape: {embedded.shape}")
+# Output: torch.Size([1, 5, 5]) - 5 tokens, each with 5-dimensional embedding</code></pre>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tutorial 2: Positional Embeddings -->
+      <section id="tutorial-2" class="px-12 py-16 bg-white">
+        <div class="max-w-4xl mx-auto">
+          <h2 class="serif-heading text-4xl font-bold text-slate-900 mb-8">Tutorial 2: Understanding Sequence Order with Positional Embeddings</h2>
+
+          <p class="text-slate-700 leading-relaxed mb-8">
+            The fundamental architecture of the Transformer processes all input tokens in parallel, making it permutation invariant. Without additional mechanisms, the model would treat sentences as unordered "bags of words," unable to distinguish between "the dog chased the cat" and "the cat chased the dog."
+            <a href="https://towardsdatascience.com/positional-embeddings-in-transformers-a-math-guide-to-rope-alibi/" class="citation-link">[148]</a>
+          </p>
+
+          <div id="absolute-pe" class="mb-12">
+            <h3 class="serif-heading text-2xl font-semibold text-slate-800 mb-6">Absolute Positional Encoding (APE)</h3>
+            <p class="text-slate-700 leading-relaxed mb-6">
+              The original Transformer paper introduced Absolute Positional Encoding, which assigns a unique positional vector to each position in the sequence. The encoding is calculated using sine and cosine functions with varying frequencies.
+              <a href="https://magazine.sebastianraschka.com/p/understanding-and-coding-self-attention" class="citation-link">[197]</a>
+            </p>
+
+            <div class="math-formula p-6 rounded-lg mb-6">
+              <h4 class="font-semibold text-slate-800 mb-4">Sinusoidal Positional Encoding Formulas</h4>
+              <div class="space-y-2">
+                <code>PE(pos, 2i) = sin(pos / 10000^(2i/d_model))</code>
+                <br>
+                <code>PE(pos, 2i+1) = cos(pos / 10000^(2i/d_model))</code>
+              </div>
+              <p class="text-sm text-slate-600 mt-3">
+                Where pos is the token position, i is the dimension index, and d_model is the embedding dimension.
+              </p>
+            </div>
+
+            <div class="code-block rounded-lg p-4 overflow-x-auto">
+              <pre class="text-sm"><code>def get_sin_enc_table(max_seq_len, d_model):
+    """Generate a sinusoidal positional encoding table."""
+    pe = torch.zeros(max_seq_len, d_model)
+    position = torch.arange(0, max_seq_len, dtype=torch.float).unsqueeze(1)
+    div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))
+    pe[:, 0::2] = torch.sin(position * div_term)
+    pe[:, 1::2] = torch.cos(position * div_term)
+    return pe</code></pre>
+            </div>
+          </div>
+
+          <div id="rope" class="mb-12">
+            <h3 class="serif-heading text-2xl font-semibold text-slate-800 mb-6">Rotary Position Embedding (RoPE)</h3>
+            <p class="text-slate-700 leading-relaxed mb-6">
+              RoPE encodes position by rotating query and key vectors in high-dimensional space. The dot product of rotated vectors depends on their relative positions, not absolute ones, making it highly effective for length extrapolation.
+              <a href="https://pli.princeton.edu/blog/2024/alibi-flashattention-speeding-alibi-3-5x-hardware-efficient-implementation" class="citation-link">[154]</a>
+            </p>
+
+            <div class="code-block rounded-lg p-4 overflow-x-auto">
+              <pre class="text-sm"><code>def precompute_freqs_cis(dim: int, seq_len: int, freqs: float = 10000.0):
+    # Calculate the rotation angles (theta) for each dimension pair
+    theta = 1.0 / (freqs ** (torch.arange(0, dim, 2).float() / dim))
+    t = torch.arange(seq_len, device=theta.device)
+    theta_mat = torch.outer(t, theta).float()
+    # Create complex exponentials e^(i*theta)
+    freqs_cis = torch.polar(torch.ones_like(theta_mat), theta_mat)
+    return freqs_cis</code></pre>
+            </div>
+          </div>
+
+          <div id="alibi" class="mb-12">
+            <h3 class="serif-heading text-2xl font-semibold text-slate-800 mb-6">Attention with Linear Biases (ALiBi)</h3>
+            <p class="text-slate-700 leading-relaxed mb-6">
+              ALiBi introduces a simple bias to attention scores based on the distance between tokens. For a query at position i and key at position j, a penalty of -m × |i - j| is added, where m is a head-specific slope.
+              <a href="https://pli.princeton.edu/blog/2024/alibi-flashattention-speeding-alibi-3-5x-hardware-efficient-implementation" class="citation-link">[154]</a>
+            </p>
+
+            <div class="math-formula p-6 rounded-lg mb-6">
+              <h4 class="font-semibold text-slate-800 mb-3">ALiBi Bias Formula</h4>
+              <code class="text-lg">B(i, j) = -m × |i - j|</code>
+              <p class="text-sm text-slate-600 mt-2">Where i is query position, j is key position, and m is a learned slope</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tutorial 3: Self-Attention -->
+      <section id="tutorial-3" class="px-12 py-16 bg-slate-50">
+        <div class="max-w-4xl mx-auto">
+          <h2 class="serif-heading text-4xl font-bold text-slate-900 mb-8">Tutorial 3: The Core Mechanism - Self-Attention and Multi-Head Attention</h2>
+
+          <p class="text-slate-700 leading-relaxed mb-8">
+            Self-attention is the revolutionary mechanism at the heart of the Transformer architecture. Unlike previous models that processed sequences sequentially, self-attention allows the model to weigh the importance of different words relative to each other, regardless of their position.
+            <a href="https://magazine.sebastianraschka.com/p/understanding-and-coding-self-attention" class="citation-link">[197]</a>
+          </p>
+
+          <div class="mb-12">
+            <h3 class="serif-heading text-2xl font-semibold text-slate-800 mb-6">The Intuition Behind Self-Attention</h3>
+            <p class="text-slate-700 leading-relaxed mb-6">
+              The "self" in self-attention refers to the mechanism operating on a single sequence, calculating attention scores between all pairs of tokens. This enables the model to capture long-range dependencies and contextual relationships more effectively than RNNs.
+              <a href="https://www.ibm.com/think/topics/attention-mechanism" class="citation-link">[213]</a>
+            </p>
+
+            <div class="bg-white rounded-lg p-6 shadow-sm border border-slate-200 mb-6">
+              <h4 class="font-semibold text-slate-800 mb-4">Queries, Keys, and Values (QKV)</h4>
+              <p class="text-slate-700 mb-4">
+                For each token, we create three vectors:
+              </p>
+              <ul class="list-disc list-inside text-slate-700 space-y-2 mb-4">
+                <li><strong>Query (Q):</strong> "What information am I looking for?"</li>
+                <li><strong>Key (K):</strong> "What information do I contain?"</li>
+                <li><strong>Value (V):</strong> "What is the content I provide?"</li>
+              </ul>
+              <div class="math-formula p-4 rounded">
+                <code class="text-lg">Attention(Q, K, V) = softmax(QK^T / √d_k)V</code>
+              </div>
+            </div>
+          </div>
+
+          <div class="mb-12">
+            <h3 class="serif-heading text-2xl font-semibold text-slate-800 mb-6">Multi-Head Attention</h3>
+            <p class="text-slate-700 leading-relaxed mb-6">
+              While a single attention head is powerful, multi-head attention allows the model to jointly attend to information from different representation subspaces. Instead of one attention function, the model splits Q, K, and V vectors into multiple smaller vectors called "heads."
+              <a href="https://xmarva.github.io/blog/2025/building-a-transformer/" class="citation-link">[201]</a>
+            </p>
+
+            <div class="code-block rounded-lg p-4 overflow-x-auto">
+              <pre class="text-sm"><code>class MultiHeadAttention(nn.Module):
+    def __init__(self, embed_size, num_heads):
+        super().__init__()
+        self.embed_size = embed_size
+        self.num_heads = num_heads
+        self.head_dim = embed_size // num_heads
+        
+        self.query = nn.Linear(embed_size, embed_size)
+        self.key = nn.Linear(embed_size, embed_size)
+        self.value = nn.Linear(embed_size, embed_size)
+        self.fc_out = nn.Linear(embed_size, embed_size)
+
+    def forward(self, x, mask=None):
+        N, seq_len, _ = x.shape
+        
+        # Split into multiple heads
+        Q = self.query(x).view(N, seq_len, self.num_heads, self.head_dim).transpose(1, 2)
+        K = self.key(x).view(N, seq_len, self.num_heads, self.head_dim).transpose(1, 2)
+        V = self.value(x).view(N, seq_len, self.num_heads, self.head_dim).transpose(1, 2)
+        
+        # Calculate attention for each head
+        scores = torch.matmul(Q, K.transpose(-2, -1)) / torch.sqrt(torch.tensor(self.head_dim, dtype=torch.float32))
+        
+        if mask is not None:
+            scores = scores.masked_fill(mask == 0, float('-inf'))
+        
+        attention_weights = F.softmax(scores, dim=-1)
+        out = torch.matmul(attention_weights, V)
+        
+        # Concatenate heads
+        out = out.transpose(1, 2).contiguous().view(N, seq_len, self.embed_size)
+        return self.fc_out(out)</code></pre>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tutorial 4: Transformer Architecture -->
+      <section id="tutorial-4" class="px-12 py-16 bg-white">
+        <div class="max-w-4xl mx-auto">
+          <h2 class="serif-heading text-4xl font-bold text-slate-900 mb-8">Tutorial 4: Assembling the Transformer Architecture</h2>
+
+          <p class="text-slate-700 leading-relaxed mb-8">
+            The Transformer architecture is built by stacking multiple identical layers, known as Transformer blocks. Each block is a self-contained unit that processes the input sequence and passes its output to the next block, creating a modular and scalable design.
+          </p>
+
+          <div class="mb-12">
+            <h3 class="serif-heading text-2xl font-semibold text-slate-800 mb-6">The Transformer Block</h3>
+            <p class="text-slate-700 leading-relaxed mb-6">
+              A standard Transformer block consists of two main sub-layers: a multi-head attention mechanism and a position-wise feed-forward network, connected by residual connections and followed by layer normalization.
+            </p>
+
+            <div class="bg-white rounded-lg p-6 shadow-sm border border-slate-200 mb-6">
+              <h4 class="font-semibold text-slate-800 mb-4">Key Components</h4>
+              <div class="grid md:grid-cols-2 gap-6">
+                <div>
+                  <h5 class="font-semibold text-slate-700 mb-2">Multi-Head Attention</h5>
+                  <p class="text-sm text-slate-600">Allows the model to weigh the importance of different tokens and build context-aware representations</p>
+                </div>
+                <div>
+                  <h5 class="font-semibold text-slate-700 mb-2">Feed-Forward Network</h5>
+                  <p class="text-sm text-slate-600">Applies non-linear transformations to introduce complexity and increase model capacity</p>
+                </div>
+                <div>
+                  <h5 class="font-semibold text-slate-700 mb-2">Residual Connections</h5>
+                  <p class="text-sm text-slate-600">Help mitigate the vanishing gradient problem in deep networks</p>
+                </div>
+                <div>
+                  <h5 class="font-semibold text-slate-700 mb-2">Layer Normalization</h5>
+                  <p class="text-sm text-slate-600">Stabilizes training by normalizing inputs across the feature dimension</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mb-12">
+            <h3 class="serif-heading text-2xl font-semibold text-slate-800 mb-6">Complete Transformer Implementation</h3>
+            <div class="code-block rounded-lg p-4 overflow-x-auto">
+              <pre class="text-sm"><code>class TransformerBlock(nn.Module):
+    def __init__(self, embed_size, num_heads, forward_expansion, dropout):
+        super().__init__()
+        self.attention = MultiHeadAttention(embed_size, num_heads)
+        self.norm1 = nn.LayerNorm(embed_size)
+        self.norm2 = nn.LayerNorm(embed_size)
+        
+        self.feed_forward = nn.Sequential(
+            nn.Linear(embed_size, forward_expansion * embed_size),
+            nn.ReLU(),
+            nn.Linear(forward_expansion * embed_size, embed_size)
+        )
+        
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self, x, mask=None):
+        # Multi-head attention with residual connection
+        attention = self.attention(x, mask)
+        x = self.norm1(x + attention)
+        
+        # Feed-forward network with residual connection
+        forward = self.feed_forward(x)
+        out = self.norm2(x + forward)
+        
+        return out
+
+class Transformer(nn.Module):
+    def __init__(self, vocab_size, embed_size, num_layers, num_heads, forward_expansion, max_length, dropout):
+        super().__init__()
+        self.embed_size = embed_size
+        self.word_embedding = nn.Embedding(vocab_size, embed_size)
+        self.position_embedding = nn.Embedding(max_length, embed_size)
+        
+        self.layers = nn.ModuleList([
+            TransformerBlock(embed_size, num_heads, forward_expansion, dropout)
+            for _ in range(num_layers)
+        ])
+        
+        self.dropout = nn.Dropout(dropout)
+        self.fc_out = nn.Linear(embed_size, vocab_size)
+
+    def forward(self, x, mask=None):
+        N, seq_length = x.shape
+        positions = torch.arange(0, seq_length).expand(N, seq_length)
+        
+        # Combine word and position embeddings
+        out = self.word_embedding(x) + self.position_embedding(positions)
+        out = self.dropout(out)
+        
+        # Pass through transformer layers
+        for layer in self.layers:
+            out = layer(out, mask)
+        
+        # Final output layer
+        return self.fc_out(out)</code></pre>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tutorial 5: Text Generation -->
+      <section id="tutorial-5" class="px-12 py-16 bg-slate-50">
+        <div class="max-w-4xl mx-auto">
+          <h2 class="serif-heading text-4xl font-bold text-slate-900 mb-8">Tutorial 5: Generating Text - Sampling and Inference</h2>
+
+          <p class="text-slate-700 leading-relaxed mb-8">
+            Once a Transformer model has been trained, it can generate text through an iterative process. The model starts with a prompt and generates one token at a time, with each new token being added to the context for the next iteration.
+          </p>
+
+          <div class="mb-12">
+            <h3 class="serif-heading text-2xl font-semibold text-slate-800 mb-6">Controlling Generation with Sampling Parameters</h3>
+            <p class="text-slate-700 leading-relaxed mb-6">
+              While we could simply choose the token with the highest probability at each step (greedy decoding), this often leads to repetitive text. Various sampling parameters help balance coherence and diversity.
+            </p>
+
+            <div class="grid md:grid-cols-3 gap-6 mb-6">
+              <div class="bg-white rounded-lg p-6 shadow-sm border border-slate-200">
+                <h4 class="font-semibold text-slate-800 mb-3">Temperature</h4>
+                <p class="text-sm text-slate-600 mb-2">Controls randomness by scaling logits before softmax</p>
+                <div class="math-formula p-3 rounded text-center">
+                  <code class="text-sm">softmax(z/T)</code>
+                </div>
+                <ul class="text-xs text-slate-500 mt-2 space-y-1">
+                  <li>• T > 1: More random</li>
+                  <li>• T < 1: More focused</li>
+                  <li>• T = 0: Greedy decoding</li>
+                </ul>
+              </div>
+              <div class="bg-white rounded-lg p-6 shadow-sm border border-slate-200">
+                <h4 class="font-semibold text-slate-800 mb-3">Top-K Sampling</h4>
+                <p class="text-sm text-slate-600 mb-2">Restricts sampling to K most likely tokens</p>
+                <div class="math-formula p-3 rounded text-center">
+                  <code class="text-sm">P(top-K) / ΣP(top-K)</code>
+                </div>
+                <ul class="text-xs text-slate-500 mt-2 space-y-1">
+                  <li>• K = 1: Greedy</li>
+                  <li>• Small K: Focused</li>
+                  <li>• Large K: Diverse</li>
+                </ul>
+              </div>
+              <div class="bg-white rounded-lg p-6 shadow-sm border border-slate-200">
+                <h4 class="font-semibold text-slate-800 mb-3">Top-P (Nucleus)</h4>
+                <p class="text-sm text-slate-600 mb-2">Selects smallest set of tokens with cumulative probability > P</p>
+                <div class="math-formula p-3 rounded text-center">
+                  <code class="text-sm">min(k) s.t. ΣP(top-k) ≥ P</code>
+                </div>
+                <ul class="text-xs text-slate-500 mt-2 space-y-1">
+                  <li>• Adaptive threshold</li>
+                  <li>• More flexible than top-K</li>
+                  <li>• P = 0.9 common choice</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div class="mb-12">
+            <h3 class="serif-heading text-2xl font-semibold text-slate-800 mb-6">Optimizing Inference with KV Caching</h3>
+            <p class="text-slate-700 leading-relaxed mb-6">
+              The main bottleneck in Transformer inference is recalculating Key and Value vectors for the entire context at each generation step. KV caching avoids this redundant computation by storing and reusing K and V vectors.
+              <a href="https://pli.princeton.edu/blog/2024/alibi-flashattention-speeding-alibi-3-5x-hardware-efficient-implementation" class="citation-link">[154]</a>
+            </p>
+
+            <div class="bg-white rounded-lg p-6 shadow-sm border border-slate-200 mb-6">
+              <h4 class="font-semibold text-slate-800 mb-4">KV Cache Benefits</h4>
+              <div class="grid md:grid-cols-2 gap-6">
+                <div>
+                  <h5 class="font-semibold text-slate-700 mb-2">Without Cache</h5>
+                  <p class="text-sm text-slate-600">Time complexity: O(n²) per step</p>
+                  <p class="text-sm text-slate-600">Recomputes all K, V vectors</p>
+                </div>
+                <div>
+                  <h5 class="font-semibold text-slate-700 mb-2">With KV Cache</h5>
+                  <p class="text-sm text-slate-600">Time complexity: O(n) per step</p>
+                  <p class="text-sm text-slate-600">Stores and reuses K, V vectors</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tutorial 6: Advanced Architectures -->
+      <section id="tutorial-6" class="px-12 py-16 bg-white">
+        <div class="max-w-4xl mx-auto">
+          <h2 class="serif-heading text-4xl font-bold text-slate-900 mb-8">Tutorial 6: Advanced Model Architectures and Techniques</h2>
+
+          <div id="moe" class="mb-12">
+            <h3 class="serif-heading text-2xl font-semibold text-slate-800 mb-6">Mixture of Experts (MoE)</h3>
+            <p class="text-slate-700 leading-relaxed mb-6">
+              The Mixture of Experts architecture addresses the challenge of scaling model capacity without proportional computational cost. It replaces dense layers with multiple specialized expert networks, using a gating mechanism to route inputs to the most appropriate experts.
+              <a href="https://neptune.ai/blog/mixture-of-experts-llms" class="citation-link">[220]</a>
+            </p>
+
+            <div class="bg-white rounded-lg p-6 shadow-sm border border-slate-200 mb-6">
+              <h4 class="font-semibold text-slate-800 mb-4">Key Concepts</h4>
+              <div class="space-y-4">
+                <div>
+                  <h5 class="font-semibold text-slate-700 mb-2">Sparse Activation</h5>
+                  <p class="text-sm text-slate-600">Only a fraction of experts are activated for each input, reducing computational cost</p>
+                </div>
+                <div>
+                  <h5 class="font-semibold text-slate-700 mb-2">Gating Network</h5>
+                  <p class="text-sm text-slate-600">Learns to route inputs to the most relevant experts based on input characteristics</p>
+                </div>
+                <div>
+                  <h5 class="font-semibold text-slate-700 mb-2">Specialized Experts</h5>
+                  <p class="text-sm text-slate-600">Each expert becomes proficient in handling specific types of inputs or linguistic patterns</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="code-block rounded-lg p-4 overflow-x-auto">
+              <pre class="text-sm"><code>class MoELayer(nn.Module):
+    def __init__(self, dim, intermediate_dim, num_experts, top_k=2):
+        super().__init__()
+        self.num_experts = num_experts
+        self.top_k = top_k
+        
+        # Create a list of expert networks
+        self.experts = nn.ModuleList([
+            Expert(dim, intermediate_dim) for _ in range(num_experts)
+        ])
+        
+        # The router is a linear layer that maps hidden states to expert logits
+        self.router = nn.Linear(dim, num_experts)
+
+    def forward(self, hidden_states):
+        batch_size, seq_len, hidden_dim = hidden_states.shape
+        
+        # Compute routing probabilities
+        router_logits = self.router(hidden_states_reshaped)
+        routing_probs = F.softmax(router_logits, dim=-1)
+        
+        # Select the top-k experts and their probabilities
+        top_k_probs, top_k_indices = torch.topk(routing_probs, self.top_k, dim=-1)
+        top_k_probs = top_k_probs / top_k_probs.sum(dim=-1, keepdim=True)
+        
+        # Process through selected experts and combine outputs
+        final_output = torch.zeros_like(hidden_states_reshaped)
+        
+        for i in range(self.top_k):
+            expert_idx = top_k_indices[:, i]
+            expert_prob = top_k_probs[:, i].unsqueeze(-1)
+            
+            for j in range(self.num_experts):
+                mask = (expert_idx == j)
+                if mask.any():
+                    expert_input = hidden_states_reshaped[mask]
+                    expert_output = self.experts[j](expert_input)
+                    final_output[mask] += expert_prob[mask] * expert_output
+        
+        return final_output.view(batch_size, seq_len, hidden_dim)</code></pre>
+            </div>
+          </div>
+
+          <div id="gqa" class="mb-12">
+            <h3 class="serif-heading text-2xl font-semibold text-slate-800 mb-6">Grouped Query Attention (GQA)</h3>
+            <p class="text-slate-700 leading-relaxed mb-6">
+              Grouped Query Attention is an optimization that balances the memory efficiency of Multi-Query Attention with the expressive power of Multi-Head Attention. GQA groups query heads and shares Key and Value heads among each group.
+            </p>
+
+            <div class="bg-white rounded-lg p-6 shadow-sm border border-slate-200 mb-6">
+              <h4 class="font-semibold text-slate-800 mb-4">GGA Benefits</h4>
+              <div class="grid md:grid-cols-2 gap-6">
+                <div>
+                  <h5 class="font-semibold text-slate-700 mb-2">Memory Efficiency</h5>
+                  <p class="text-sm text-slate-600">Reduces KV cache size by sharing Key and Value heads</p>
+                </div>
+                <div>
+                  <h5 class="font-semibold text-slate-700 mb-2">Performance Balance</h5>
+                  <p class="text-sm text-slate-600">Maintains most of MHA's expressive power while improving efficiency</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="math-formula p-6 rounded-lg mb-6">
+              <h4 class="font-semibold text-slate-800 mb-3">GQA Configuration</h4>
+              <p class="text-slate-700 mb-2">For N query heads and G groups:</p>
+              <code class="text-base">Query heads per group: N/G</code>
+              <br>
+              <code class="text-base">Key/Value heads: G</code>
+              <p class="text-sm text-slate-600 mt-2">Each K/V head shared by N/G query heads</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tutorial 7: Training and Fine-Tuning -->
+      <section id="tutorial-7" class="px-12 py-16 bg-slate-50">
+        <div class="max-w-4xl mx-auto">
+          <h2 class="serif-heading text-4xl font-bold text-slate-900 mb-8">Tutorial 7: Training and Fine-Tuning LLMs</h2>
+
+          <div class="mb-12">
+            <h3 class="serif-heading text-2xl font-semibold text-slate-800 mb-6">Pretraining Objectives</h3>
+            <p class="text-slate-700 leading-relaxed mb-6">
+              Before fine-tuning for specific tasks, LLMs must be pretrained on massive text corpora. The goal is to teach fundamental language structure through self-supervised learning.
+            </p>
+
+            <div class="grid md:grid-cols-2 gap-6 mb-6">
+              <div class="bg-white rounded-lg p-6 shadow-sm border border-slate-200">
+                <h4 class="font-semibold text-slate-800 mb-3">Causal Language Modeling (CLM)</h4>
+                <p class="text-sm text-slate-600 mb-3">Used by: GPT models</p>
+                <p class="text-sm text-slate-600">Predict next token given all previous tokens</p>
+                <div class="mt-3 p-2 bg-slate-50 rounded text-xs">
+                  <strong>Example:</strong> "The cat sat on the __" → "mat"
+                </div>
+              </div>
+              <div class="bg-white rounded-lg p-6 shadow-sm border border-slate-200">
+                <h4 class="font-semibold text-slate-800 mb-3">Masked Language Modeling (MLM)</h4>
+                <p class="text-sm text-slate-600 mb-3">Used by: BERT models</p>
+                <p class="text-sm text-slate-600">Predict masked tokens given bidirectional context</p>
+                <div class="mt-3 p-2 bg-slate-50 rounded text-xs">
+                  <strong>Example:</strong> "The [MASK] sat on the mat" → "cat"
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mb-12">
+            <h3 class="serif-heading text-2xl font-semibold text-slate-800 mb-6">Fine-Tuning Techniques</h3>
+            <p class="text-slate-700 leading-relaxed mb-6">
+              Fine-tuning adapts pretrained models to specific tasks. Modern approaches include instruction tuning and reinforcement learning from human feedback.
+            </p>
+
+            <div class="space-y-6">
+              <div class="bg-white rounded-lg p-6 shadow-sm border border-slate-200">
+                <h4 class="font-semibold text-slate-800 mb-3">Instruction Tuning</h4>
+                <p class="text-sm text-slate-600 mb-3">Trains models on instruction-response pairs to improve task following capabilities</p>
+                <div class="text-xs text-slate-500">
+                  <strong>Example:</strong> "Write a poem about cats" → "Whiskers soft and eyes so bright..."
+                </div>
+              </div>
+              <div class="bg-white rounded-lg p-6 shadow-sm border border-slate-200">
+                <h4 class="font-semibold text-slate-800 mb-3">RLHF (Reinforcement Learning from Human Feedback)</h4>
+                <p class="text-sm text-slate-600 mb-3">Three-step process using human preferences to align model behavior</p>
+                <ol class="text-xs text-slate-500 list-decimal list-inside space-y-1">
+                  <li>Train reward model on human preferences</li>
+                  <li>Use reinforcement learning to optimize policy</li>
+                  <li>Fine-tune against the reward model</li>
+                </ol>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tutorial 8: Scaling and Optimization -->
+      <section id="tutorial-8" class="px-12 py-16 bg-white">
+        <div class="max-w-4xl mx-auto">
+          <h2 class="serif-heading text-4xl font-bold text-slate-900 mb-8">Tutorial 8: Scaling Laws and Model Optimization</h2>
+
+          <div class="mb-12">
+            <h3 class="serif-heading text-2xl font-semibold text-slate-800 mb-6">Scaling Laws in LLMs</h3>
+            <p class="text-slate-700 leading-relaxed mb-6">
+              Scaling laws reveal predictable relationships between model size, training data, and performance. These empirical relationships guide resource allocation for training new models.
+            </p>
+
+            <div class="math-formula p-6 rounded-lg mb-6">
+              <h4 class="font-semibold text-slate-800 mb-3">Scaling Law Formula</h4>
+              <code class="text-lg">L(N, D) = A × N^(-α) + B × D^(-β) + E</code>
+              <div class="mt-3 text-sm text-slate-600">
+                <p><strong>Where:</strong></p>
+                <ul class="list-disc list-inside space-y-1 mt-2">
+                  <li>L = Cross-entropy loss (performance measure)</li>
+                  <li>N = Number of model parameters</li>
+                  <li>D = Training dataset size</li>
+                  <li>A, B, α, β = Empirical constants</li>
+                  <li>E = Irreducible error</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div class="mb-12">
+            <h3 class="serif-heading text-2xl font-semibold text-slate-800 mb-6">Model Quantization</h3>
+            <p class="text-slate-700 leading-relaxed mb-6">
+              Quantization reduces memory footprint and computational cost by converting high-precision parameters to lower-precision formats, enabling deployment on resource-constrained devices.
+            </p>
+
+            <div class="grid md:grid-cols-2 gap-6 mb-6">
+              <div class="bg-white rounded-lg p-6 shadow-sm border border-slate-200">
+                <h4 class="font-semibold text-slate-800 mb-3">Post-Training Quantization (PTQ)</h4>
+                <p class="text-sm text-slate-600 mb-3">Simplest approach - quantizes pretrained models without retraining</p>
+                <div class="text-xs text-slate-500">
+                  <strong>Pros:</strong> Easy to implement
+                  <br>
+                  <strong>Cons:</strong> Can degrade performance
+                </div>
+              </div>
+              <div class="bg-white rounded-lg p-6 shadow-sm border border-slate-200">
+                <h4 class="font-semibold text-slate-800 mb-3">Quantization-Aware Training (QAT)</h4>
+                <p class="text-sm text-slate-600 mb-3">Simulates quantization during training for better performance</p>
+                <div class="text-xs text-slate-500">
+                  <strong>Pros:</strong> Better performance retention
+                  <br>
+                  <strong>Cons:</strong> Requires retraining
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mb-12">
+            <h3 class="serif-heading text-2xl font-semibold text-slate-800 mb-6">Training and Inference Stacks</h3>
+            <p class="text-slate-700 leading-relaxed mb-6">
+              Specialized software stacks enable efficient training and deployment of large language models through distributed computing and optimization techniques.
+            </p>
+
+            <div class="space-y-6">
+              <div class="bg-white rounded-lg p-6 shadow-sm border border-slate-200">
+                <h4 class="font-semibold text-slate-800 mb-3">DeepSpeed</h4>
+                <p class="text-sm text-slate-600 mb-3">Training optimization library with:</p>
+                <ul class="text-xs text-slate-500 list-disc list-inside space-y-1">
+                  <li>ZeRO (Zero Redundancy Optimizer)</li>
+                  <li>Pipeline parallelism</li>
+                  <li>Mixed precision training</li>
+                </ul>
+              </div>
+              <div class="bg-white rounded-lg p-6 shadow-sm border border-slate-200">
+                <h4 class="font-semibold text-slate-800 mb-3">vLLM</h4>
+                <p class="text-sm text-slate-600 mb-3">High-throughput inference engine featuring:</p>
+                <ul class="text-xs text-slate-500 list-disc list-inside space-y-1">
+                  <li>PagedAttention algorithm</li>
+                  <li>Continuous batching</li>
+                  <li>Quantization support</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <script>
+        // Table of Contents scrolling behavior
+        document.addEventListener('DOMContentLoaded', function() {
+            const tocLinks = document.querySelectorAll('.toc-link');
+            const sections = document.querySelectorAll('section[id]');
+            
+            // Update active section on scroll
+            window.addEventListener('scroll', function() {
+                let current = '';
+                sections.forEach(section => {
+                    const sectionTop = section.offsetTop;
+                    const sectionHeight = section.clientHeight;
+                    if (window.pageYOffset >= sectionTop - 200) {
+                        current = section.getAttribute('id');
+                    }
+                });
+                
+                tocLinks.forEach(link => {
+                    link.classList.remove('active');
+                    if (link.getAttribute('href').substring(1) === current) {
+                        link.classList.add('active');
+                    }
+                });
+            });
+            
+            // Smooth scrolling for TOC links
+            tocLinks.forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const targetId = this.getAttribute('href').substring(1);
+                    const targetSection = document.getElementById(targetId);
+                    if (targetSection) {
+                        targetSection.scrollIntoView({
+                            behavior: 'smooth',
+                            block: 'start'
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+  </body>
+
+</html>
+<!DOCTYPE html><html lang="en"><head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>The Architecture of Understanding: A Deep Dive into Large Language Models</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Tiempos+Headline:wght@400;700&amp;family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+    <style>
+        :root {
+            --primary: #1e293b;
+            --secondary: #64748b;
+            --accent: #0f172a;
+            --surface: #f8fafc;
+            --muted: #94a3b8;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            line-height: 1.7;
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+        }
+        
+        .serif-heading {
+            font-family: 'Tiempos Headline', serif;
+        }
+        
+        .hero-gradient {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+        }
+        
+        .math-formula {
+            background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+            border-left: 4px solid #64748b;
+        }
+        
+        .toc-link {
+            transition: all 0.3s ease;
+        }
+        
+        .toc-link:hover {
+            background-color: #f1f5f9;
+            padding-left: 1rem;
+        }
+        
+        .toc-link.active {
+            background-color: #e2e8f0;
+            border-left: 3px solid #64748b;
+            padding-left: 0.75rem;
+        }
+        
+        .code-block {
+            background: #1e293b;
+            color: #f8fafc;
+            font-family: 'Monaco', 'Menlo', monospace;
+        }
+        
+        .citation-link {
+            color: #64748b;
+            text-decoration: none;
+            font-size: 0.875rem;
+            vertical-align: super;
+            padding: 0 2px;
+        }
+        
+        .citation-link:hover {
+            color: #334155;
+        }
+        
+        .bento-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            grid-template-rows: auto auto;
+            gap: 1.5rem;
+        }
+        
+        .bento-main {
+            grid-row: 1 / -1;
+        }
+        
+        @media (max-width: 768px) {
+            .bento-grid {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto;
+            }
+            
+            .bento-main {
+                grid-row: auto;
+            }
+        }
+    </style>
+  </head>
+
+  <body class="text-slate-800">
+    <!-- Fixed Table of Contents -->
+    <nav class="fixed left-0 top-0 h-screen w-72 bg-white shadow-lg z-40 overflow-y-auto border-r border-slate-200">
+      <div class="p-6">
+        <h3 class="serif-heading text-lg font-bold text-slate-900 mb-4">Contents</h3>
+        <ul class="space-y-2 text-sm">
+          <li>
+            <a href="#executive-summary" class="toc-link block py-2 px-3 rounded-md text-slate-700 hover:text-slate-900">Executive Summary</a>
+          </li>
+          <li>
+            <a href="#tutorial-1" class="toc-link block py-2 px-3 rounded-md text-slate-700 hover:text-slate-900">1. Building Blocks: Tokens &amp; Embeddings</a>
+            <ul class="ml-4 mt-2 space-y-1">
+              <li>
+                <a href="#tokenization" class="toc-link block py-1 px-3 text-xs text-slate-600 hover:text-slate-800">Tokenization</a>
+              </li>
+              <li>
+                <a href="#embeddings" class="toc-link block py-1 px-3 text-xs text-slate-600 hover:text-slate-800">Embeddings</a>
+              </li>
+            </ul>
+          </li>
+          <li>
+            <a href="#tutorial-2" class="toc-link block py-2 px-3 rounded-md text-slate-700 hover:text-slate-900">2. Positional Embeddings</a>
+            <ul class="ml-4 mt-2 space-y-1">
+              <li>
+                <a href="#absolute-pe" class="toc-link block py-1 px-3 text-xs text-slate-600 hover:text-slate-800">Absolute PE</a>
+              </li>
+              <li>
+                <a href="#rope" class="toc-link block py-1 px-3 text-xs text-slate-600 hover:text-slate-800">RoPE</a>
+              </li>
+              <li>
+                <a href="#alibi" class="toc-link block py-1 px-3 text-xs text-slate-600 hover:text-slate-800">ALiBi</a>
+              </li>
+            </ul>
+          </li>
+          <li>
+            <a href="#tutorial-3" class="toc-link block py-2 px-3 rounded-md text-slate-700 hover:text-slate-900">3. Self-Attention &amp; Multi-Head</a>
+          </li>
+          <li>
+            <a href="#tutorial-4" class="toc-link block py-2 px-3 rounded-md text-slate-700 hover:text-slate-900">4. Transformer Architecture</a>
+          </li>
+          <li>
+            <a href="#tutorial-5" class="toc-link block py-2 px-3 rounded-md text-slate-700 hover:text-slate-900">5. Text Generation &amp; Inference</a>
+          </li>
+          <li>
+            <a href="#tutorial-6" class="toc-link block py-2 px-3 rounded-md text-slate-700 hover:text-slate-900">6. Advanced Architectures</a>
+            <ul class="ml-4 mt-2 space-y-1">
+              <li>
+                <a href="#moe" class="toc-link block py-1 px-3 text-xs text-slate-600 hover:text-slate-800">Mixture of Experts</a>
+              </li>
+              <li>
+                <a href="#gqa" class="toc-link block py-1 px-3 text-xs text-slate-600 hover:text-slate-800">Grouped Query Attention</a>
+              </li>
+            </ul>
+          </li>
+          <li>
+            <a href="#tutorial-7" class="toc-link block py-2 px-3 rounded-md text-slate-700 hover:text-slate-900">7. Training &amp; Fine-Tuning</a>
+          </li>
+          <li>
+            <a href="#tutorial-8" class="toc-link block py-2 px-3 rounded-md text-slate-700 hover:text-slate-900">8. Scaling &amp; Optimization</a>
+          </li>
+        </ul>
+      </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="ml-72 min-h-screen">
+      <!-- Hero Section -->
+      <section class="hero-gradient text-white relative overflow-hidden">
+        <div class="absolute inset-0 opacity-20">
+          <img src="https://kimi-web-img.moonshot.cn/img/camo.githubusercontent.com/b8f5674717fe947081fd744c3043f96fe8c790d4" alt="Abstract neural network visualization with interconnected nodes" class="w-full h-full object-cover" size="wallpaper" aspect="wide" query="abstract neural network visualization" referrerpolicy="no-referrer" data-modified="1" data-score="0.00"/>
+        </div>
+        <div class="relative z-10 px-12 py-16">
+          <div class="bento-grid max-w-7xl mx-auto">
+            <div class="bento-main">
+              <h1 class="serif-heading text-4xl sm:text-5xl md:text-6xl font-bold leading-tight mb-6">
+                <span class="italic">The Architecture</span>
+                <br/>
+                <span class="text-slate-300">of Understanding</span>
+              </h1>
+              <p class="text-xl text-slate-300 max-w-3xl leading-relaxed">
+                A comprehensive journey through the fundamental mechanisms that power Large Language Models, from tokenization to trillion-parameter architectures.
+              </p>
+            </div>
+            <div class="space-y-4">
+              <div class="bg-white/10 backdrop-blur rounded-lg p-4">
+                <h3 class="font-semibold text-sm uppercase tracking-wide mb-2">Key Concepts</h3>
+                <ul class="text-sm space-y-1 text-slate-300">
+                  <li>• Transformers &amp; Attention</li>
+                  <li>• Embeddings &amp; Positional Encoding</li>
+                  <li>• Mixture of Experts</li>
+                  <li>• Training at Scale</li>
+                </ul>
+              </div>
+              <div class="bg-white/10 backdrop-blur rounded-lg p-4">
+                <h3 class="font-semibold text-sm uppercase tracking-wide mb-2">Architecture Focus</h3>
+                <p class="text-sm text-slate-300">GPT, Qwen, and state-of-the-art LLM implementations</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Executive Summary -->
+      <section id="executive-summary" class="px-12 py-16 bg-white">
+        <div class="max-w-4xl mx-auto">
+          <h2 class="serif-heading text-3xl font-bold text-slate-900 mb-8">Executive Summary</h2>
+          <div class="prose prose-lg max-w-none">
+            <p class="text-xl text-slate-700 leading-relaxed mb-6">
+              Large Language Models (LLMs) like GPT and Qwen are complex systems built on a foundation of relatively simple concepts. At their core, they convert text into numerical representations (tokens and embeddings), understand the order of words using positional encodings, and use a mechanism called self-attention to weigh the importance of different words in a sentence.
+            </p>
+            <p class="text-slate-700 leading-relaxed mb-6">
+              These components are assembled into a deep architecture called a Transformer. During text generation, the model uses sampling techniques to choose the next word and employs optimizations like a KV cache to make the process fast and efficient. Advanced techniques like Mixture of Experts (MoE) and Grouped Query Attention (GQA) further enhance performance and efficiency, while methods like quantization make these large models more accessible.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tutorial 1: Tokens and Embeddings -->
+      <section id="tutorial-1" class="px-12 py-16 bg-slate-50">
+        <div class="max-w-4xl mx-auto">
+          <h2 class="serif-heading text-4xl font-bold text-slate-900 mb-8">Tutorial 1: The Building Blocks of Language for Models</h2>
+
+          <div id="tokenization" class="mb-12">
+            <h3 class="serif-heading text-2xl font-semibold text-slate-800 mb-6">Tokenization: Converting Text to Numbers</h3>
+            <p class="text-slate-700 leading-relaxed mb-6">
+              Tokenization is the foundational first step in enabling a machine learning model to process human language. Since models operate on numerical data, every piece of text must be broken down into smaller, discrete units called <strong>tokens</strong>. These tokens can represent words, subwords, or even individual characters.
+              <a href="https://towardsdatascience.com/positional-embeddings-in-transformers-a-math-guide-to-rope-alibi/" class="citation-link">[148]</a>
+            </p>
+
+            <div class="bg-white rounded-lg p-6 shadow-sm border border-slate-200 mb-6">
+              <h4 class="font-semibold text-slate-800 mb-4">Understanding Subword Tokenization</h4>
+              <p class="text-slate-700 leading-relaxed mb-4">
+                Subword tokenization bridges the gap between word-level and character-level approaches. The core idea is to represent words as sequences of smaller, meaningful units. For example, &#34;tokenization&#34; might be represented as
+                <code>[&#34;token&#34;, &#34;ization&#34;]</code>.
+              </p>
+
+              <div class="code-block rounded-lg p-4 overflow-x-auto mb-4">
+                <pre class="text-sm"><code>class SimpleTokenizer:
+    def __init__(self, text):
+        # Create a sorted list of unique characters in the text
+        chars = sorted(list(set(text)))
+        # Create mappings from character to index and index to character
+        self.stoi = {ch: i for i, ch in enumerate(chars)}
+        self.itos = {i: ch for ch, i in self.stoi.items()}
+        self.vocab_size = len(self.stoi)
+
+    def encode(self, text):
+        &#34;&#34;&#34;Encodes a string into a list of character IDs.&#34;&#34;&#34;
+        return [self.stoi[c] for c in text]
+
+    def decode(self, ids):
+        &#34;&#34;&#34;Decodes a list of character IDs into a string.&#34;&#34;&#34;
+        return &#39;&#39;.join([self.itos[i] for i in ids])</code></pre>
+              </div>
+            </div>
+          </div>
+
+          <div id="embeddings" class="mb-12">
+            <h3 class="serif-heading text-2xl font-semibold text-slate-800 mb-6">Embeddings: Giving Meaning to Tokens</h3>
+            <p class="text-slate-700 leading-relaxed mb-6">
+              Once text has been tokenized, the next step is to transform these discrete tokens into continuous vector representations. This process is called <strong>embedding</strong>. The core idea is to map each token from a high-dimensional, sparse space to a lower-dimensional, dense vector space that captures semantic and syntactic relationships.
+            </p>
+
+            <div class="math-formula p-6 rounded-lg mb-6">
+              <h4 class="font-semibold text-slate-800 mb-3">Mathematical Formulation</h4>
+              <p class="text-slate-700 mb-2">Given a vocabulary size V and embedding dimension d:</p>
+              <code class="text-lg">Embedding: ℤ → ℝᵈ</code>
+              <p class="text-sm text-slate-600 mt-2">Where each token ID is mapped to a d-dimensional vector</p>
+            </div>
+
+            <div class="code-block rounded-lg p-4 overflow-x-auto">
+              <pre class="text-sm"><code>import torch
+import torch.nn as nn
+
+# Define vocabulary size and embedding dimension
+vocab_size = 8  # From our SimpleTokenizer example
+embedding_dim = 5
+
+# Create the embedding layer
+embedding_layer = nn.Embedding(vocab_size, embedding_dim)
+
+# Example input: token IDs for &#34;hello&#34;
+input_ids = torch.tensor([[3, 2, 4, 4, 5]])
+
+# Pass the token IDs through the embedding layer
+embedded = embedding_layer(input_ids)
+
+print(f&#34;Input IDs shape: {input_ids.shape}&#34;)
+print(f&#34;Embedded shape: {embedded.shape}&#34;)
+# Output: torch.Size([1, 5, 5]) - 5 tokens, each with 5-dimensional embedding</code></pre>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tutorial 2: Positional Embeddings -->
+      <section id="tutorial-2" class="px-12 py-16 bg-white">
+        <div class="max-w-4xl mx-auto">
+          <h2 class="serif-heading text-4xl font-bold text-slate-900 mb-8">Tutorial 2: Understanding Sequence Order with Positional Embeddings</h2>
+
+          <p class="text-slate-700 leading-relaxed mb-8">
+            The fundamental architecture of the Transformer processes all input tokens in parallel, making it permutation invariant. Without additional mechanisms, the model would treat sentences as unordered &#34;bags of words,&#34; unable to distinguish between &#34;the dog chased the cat&#34; and &#34;the cat chased the dog.&#34;
+            <a href="https://towardsdatascience.com/positional-embeddings-in-transformers-a-math-guide-to-rope-alibi/" class="citation-link">[148]</a>
+          </p>
+
+          <div id="absolute-pe" class="mb-12">
+            <h3 class="serif-heading text-2xl font-semibold text-slate-800 mb-6">Absolute Positional Encoding (APE)</h3>
+            <p class="text-slate-700 leading-relaxed mb-6">
+              The original Transformer paper introduced Absolute Positional Encoding, which assigns a unique positional vector to each position in the sequence. The encoding is calculated using sine and cosine functions with varying frequencies.
+              <a href="https://magazine.sebastianraschka.com/p/understanding-and-coding-self-attention" class="citation-link">[197]</a>
+            </p>
+
+            <div class="math-formula p-6 rounded-lg mb-6">
+              <h4 class="font-semibold text-slate-800 mb-4">Sinusoidal Positional Encoding Formulas</h4>
+              <div class="space-y-2">
+                <code>PE(pos, 2i) = sin(pos / 10000^(2i/d_model))</code>
+                <br/>
+                <code>PE(pos, 2i+1) = cos(pos / 10000^(2i/d_model))</code>
+              </div>
+              <p class="text-sm text-slate-600 mt-3">
+                Where pos is the token position, i is the dimension index, and d_model is the embedding dimension.
+              </p>
+            </div>
+
+            <div class="code-block rounded-lg p-4 overflow-x-auto">
+              <pre class="text-sm"><code>def get_sin_enc_table(max_seq_len, d_model):
+    &#34;&#34;&#34;Generate a sinusoidal positional encoding table.&#34;&#34;&#34;
+    pe = torch.zeros(max_seq_len, d_model)
+    position = torch.arange(0, max_seq_len, dtype=torch.float).unsqueeze(1)
+    div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))
+    pe[:, 0::2] = torch.sin(position * div_term)
+    pe[:, 1::2] = torch.cos(position * div_term)
+    return pe</code></pre>
+            </div>
+          </div>
+
+          <div id="rope" class="mb-12">
+            <h3 class="serif-heading text-2xl font-semibold text-slate-800 mb-6">Rotary Position Embedding (RoPE)</h3>
+            <p class="text-slate-700 leading-relaxed mb-6">
+              RoPE encodes position by rotating query and key vectors in high-dimensional space. The dot product of rotated vectors depends on their relative positions, not absolute ones, making it highly effective for length extrapolation.
+              <a href="https://pli.princeton.edu/blog/2024/alibi-flashattention-speeding-alibi-3-5x-hardware-efficient-implementation" class="citation-link">[154]</a>
+            </p>
+
+            <div class="code-block rounded-lg p-4 overflow-x-auto">
+              <pre class="text-sm"><code>def precompute_freqs_cis(dim: int, seq_len: int, freqs: float = 10000.0):
+    # Calculate the rotation angles (theta) for each dimension pair
+    theta = 1.0 / (freqs ** (torch.arange(0, dim, 2).float() / dim))
+    t = torch.arange(seq_len, device=theta.device)
+    theta_mat = torch.outer(t, theta).float()
+    # Create complex exponentials e^(i*theta)
+    freqs_cis = torch.polar(torch.ones_like(theta_mat), theta_mat)
+    return freqs_cis</code></pre>
+            </div>
+          </div>
+
+          <div id="alibi" class="mb-12">
+            <h3 class="serif-heading text-2xl font-semibold text-slate-800 mb-6">Attention with Linear Biases (ALiBi)</h3>
+            <p class="text-slate-700 leading-relaxed mb-6">
+              ALiBi introduces a simple bias to attention scores based on the distance between tokens. For a query at position i and key at position j, a penalty of -m × |i - j| is added, where m is a head-specific slope.
+              <a href="https://pli.princeton.edu/blog/2024/alibi-flashattention-speeding-alibi-3-5x-hardware-efficient-implementation" class="citation-link">[154]</a>
+            </p>
+
+            <div class="math-formula p-6 rounded-lg mb-6">
+              <h4 class="font-semibold text-slate-800 mb-3">ALiBi Bias Formula</h4>
+              <code class="text-lg">B(i, j) = -m × |i - j|</code>
+              <p class="text-sm text-slate-600 mt-2">Where i is query position, j is key position, and m is a learned slope</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tutorial 3: Self-Attention -->
+      <section id="tutorial-3" class="px-12 py-16 bg-slate-50">
+        <div class="max-w-4xl mx-auto">
+          <h2 class="serif-heading text-4xl font-bold text-slate-900 mb-8">Tutorial 3: The Core Mechanism - Self-Attention and Multi-Head Attention</h2>
+
+          <p class="text-slate-700 leading-relaxed mb-8">
+            Self-attention is the revolutionary mechanism at the heart of the Transformer architecture. Unlike previous models that processed sequences sequentially, self-attention allows the model to weigh the importance of different words relative to each other, regardless of their position.
+            <a href="https://magazine.sebastianraschka.com/p/understanding-and-coding-self-attention" class="citation-link">[197]</a>
+          </p>
+
+          <div class="mb-12">
+            <h3 class="serif-heading text-2xl font-semibold text-slate-800 mb-6">The Intuition Behind Self-Attention</h3>
+            <p class="text-slate-700 leading-relaxed mb-6">
+              The &#34;self&#34; in self-attention refers to the mechanism operating on a single sequence, calculating attention scores between all pairs of tokens. This enables the model to capture long-range dependencies and contextual relationships more effectively than RNNs.
+              <a href="https://www.ibm.com/think/topics/attention-mechanism" class="citation-link">[213]</a>
+            </p>
+
+            <div class="bg-white rounded-lg p-6 shadow-sm border border-slate-200 mb-6">
+              <h4 class="font-semibold text-slate-800 mb-4">Queries, Keys, and Values (QKV)</h4>
+              <p class="text-slate-700 mb-4">
+                For each token, we create three vectors:
+              </p>
+              <ul class="list-disc list-inside text-slate-700 space-y-2 mb-4">
+                <li><strong>Query (Q):</strong> &#34;What information am I looking for?&#34;</li>
+                <li><strong>Key (K):</strong> &#34;What information do I contain?&#34;</li>
+                <li><strong>Value (V):</strong> &#34;What is the content I provide?&#34;</li>
+              </ul>
+              <div class="math-formula p-4 rounded">
+                <code class="text-lg">Attention(Q, K, V) = softmax(QK^T / √d_k)V</code>
+              </div>
+            </div>
+          </div>
+
+          <div class="mb-12">
+            <h3 class="serif-heading text-2xl font-semibold text-slate-800 mb-6">Multi-Head Attention</h3>
+            <p class="text-slate-700 leading-relaxed mb-6">
+              While a single attention head is powerful, multi-head attention allows the model to jointly attend to information from different representation subspaces. Instead of one attention function, the model splits Q, K, and V vectors into multiple smaller vectors called &#34;heads.&#34;
+              <a href="https://xmarva.github.io/blog/2025/building-a-transformer/" class="citation-link">[201]</a>
+            </p>
+
+            <div class="code-block rounded-lg p-4 overflow-x-auto">
+              <pre class="text-sm"><code>class MultiHeadAttention(nn.Module):
+    def __init__(self, embed_size, num_heads):
+        super().__init__()
+        self.embed_size = embed_size
+        self.num_heads = num_heads
+        self.head_dim = embed_size // num_heads
+        
+        self.query = nn.Linear(embed_size, embed_size)
+        self.key = nn.Linear(embed_size, embed_size)
+        self.value = nn.Linear(embed_size, embed_size)
+        self.fc_out = nn.Linear(embed_size, embed_size)
+
+    def forward(self, x, mask=None):
+        N, seq_len, _ = x.shape
+        
+        # Split into multiple heads
+        Q = self.query(x).view(N, seq_len, self.num_heads, self.head_dim).transpose(1, 2)
+        K = self.key(x).view(N, seq_len, self.num_heads, self.head_dim).transpose(1, 2)
+        V = self.value(x).view(N, seq_len, self.num_heads, self.head_dim).transpose(1, 2)
+        
+        # Calculate attention for each head
+        scores = torch.matmul(Q, K.transpose(-2, -1)) / torch.sqrt(torch.tensor(self.head_dim, dtype=torch.float32))
+        
+        if mask is not None:
+            scores = scores.masked_fill(mask == 0, float(&#39;-inf&#39;))
+        
+        attention_weights = F.softmax(scores, dim=-1)
+        out = torch.matmul(attention_weights, V)
+        
+        # Concatenate heads
+        out = out.transpose(1, 2).contiguous().view(N, seq_len, self.embed_size)
+        return self.fc_out(out)</code></pre>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tutorial 4: Transformer Architecture -->
+      <section id="tutorial-4" class="px-12 py-16 bg-white">
+        <div class="max-w-4xl mx-auto">
+          <h2 class="serif-heading text-4xl font-bold text-slate-900 mb-8">Tutorial 4: Assembling the Transformer Architecture</h2>
+
+          <p class="text-slate-700 leading-relaxed mb-8">
+            The Transformer architecture is built by stacking multiple identical layers, known as Transformer blocks. Each block is a self-contained unit that processes the input sequence and passes its output to the next block, creating a modular and scalable design.
+          </p>
+
+          <div class="mb-12">
+            <h3 class="serif-heading text-2xl font-semibold text-slate-800 mb-6">The Transformer Block</h3>
+            <p class="text-slate-700 leading-relaxed mb-6">
+              A standard Transformer block consists of two main sub-layers: a multi-head attention mechanism and a position-wise feed-forward network, connected by residual connections and followed by layer normalization.
+            </p>
+
+            <div class="bg-white rounded-lg p-6 shadow-sm border border-slate-200 mb-6">
+              <h4 class="font-semibold text-slate-800 mb-4">Key Components</h4>
+              <div class="grid md:grid-cols-2 gap-6">
+                <div>
+                  <h5 class="font-semibold text-slate-700 mb-2">Multi-Head Attention</h5>
+                  <p class="text-sm text-slate-600">Allows the model to weigh the importance of different tokens and build context-aware representations</p>
+                </div>
+                <div>
+                  <h5 class="font-semibold text-slate-700 mb-2">Feed-Forward Network</h5>
+                  <p class="text-sm text-slate-600">Applies non-linear transformations to introduce complexity and increase model capacity</p>
+                </div>
+                <div>
+                  <h5 class="font-semibold text-slate-700 mb-2">Residual Connections</h5>
+                  <p class="text-sm text-slate-600">Help mitigate the vanishing gradient problem in deep networks</p>
+                </div>
+                <div>
+                  <h5 class="font-semibold text-slate-700 mb-2">Layer Normalization</h5>
+                  <p class="text-sm text-slate-600">Stabilizes training by normalizing inputs across the feature dimension</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mb-12">
+            <h3 class="serif-heading text-2xl font-semibold text-slate-800 mb-6">Complete Transformer Implementation</h3>
+            <div class="code-block rounded-lg p-4 overflow-x-auto">
+              <pre class="text-sm"><code>class TransformerBlock(nn.Module):
+    def __init__(self, embed_size, num_heads, forward_expansion, dropout):
+        super().__init__()
+        self.attention = MultiHeadAttention(embed_size, num_heads)
+        self.norm1 = nn.LayerNorm(embed_size)
+        self.norm2 = nn.LayerNorm(embed_size)
+        
+        self.feed_forward = nn.Sequential(
+            nn.Linear(embed_size, forward_expansion * embed_size),
+            nn.ReLU(),
+            nn.Linear(forward_expansion * embed_size, embed_size)
+        )
+        
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self, x, mask=None):
+        # Multi-head attention with residual connection
+        attention = self.attention(x, mask)
+        x = self.norm1(x + attention)
+        
+        # Feed-forward network with residual connection
+        forward = self.feed_forward(x)
+        out = self.norm2(x + forward)
+        
+        return out
+
+class Transformer(nn.Module):
+    def __init__(self, vocab_size, embed_size, num_layers, num_heads, forward_expansion, max_length, dropout):
+        super().__init__()
+        self.embed_size = embed_size
+        self.word_embedding = nn.Embedding(vocab_size, embed_size)
+        self.position_embedding = nn.Embedding(max_length, embed_size)
+        
+        self.layers = nn.ModuleList([
+            TransformerBlock(embed_size, num_heads, forward_expansion, dropout)
+            for _ in range(num_layers)
+        ])
+        
+        self.dropout = nn.Dropout(dropout)
+        self.fc_out = nn.Linear(embed_size, vocab_size)
+
+    def forward(self, x, mask=None):
+        N, seq_length = x.shape
+        positions = torch.arange(0, seq_length).expand(N, seq_length)
+        
+        # Combine word and position embeddings
+        out = self.word_embedding(x) + self.position_embedding(positions)
+        out = self.dropout(out)
+        
+        # Pass through transformer layers
+        for layer in self.layers:
+            out = layer(out, mask)
+        
+        # Final output layer
+        return self.fc_out(out)</code></pre>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tutorial 5: Text Generation -->
+      <section id="tutorial-5" class="px-12 py-16 bg-slate-50">
+        <div class="max-w-4xl mx-auto">
+          <h2 class="serif-heading text-4xl font-bold text-slate-900 mb-8">Tutorial 5: Generating Text - Sampling and Inference</h2>
+
+          <p class="text-slate-700 leading-relaxed mb-8">
+            Once a Transformer model has been trained, it can generate text through an iterative process. The model starts with a prompt and generates one token at a time, with each new token being added to the context for the next iteration.
+          </p>
+
+          <div class="mb-12">
+            <h3 class="serif-heading text-2xl font-semibold text-slate-800 mb-6">Controlling Generation with Sampling Parameters</h3>
+            <p class="text-slate-700 leading-relaxed mb-6">
+              While we could simply choose the token with the highest probability at each step (greedy decoding), this often leads to repetitive text. Various sampling parameters help balance coherence and diversity.
+            </p>
+
+            <div class="grid md:grid-cols-3 gap-6 mb-6">
+              <div class="bg-white rounded-lg p-6 shadow-sm border border-slate-200">
+                <h4 class="font-semibold text-slate-800 mb-3">Temperature</h4>
+                <p class="text-sm text-slate-600 mb-2">Controls randomness by scaling logits before softmax</p>
+                <div class="math-formula p-3 rounded text-center">
+                  <code class="text-sm">softmax(z/T)</code>
+                </div>
+                <ul class="text-xs text-slate-500 mt-2 space-y-1">
+                  <li>• T &gt; 1: More random</li>
+                  <li>• T &lt; 1: More focused</li>
+                  <li>• T = 0: Greedy decoding</li>
+                </ul>
+              </div>
+              <div class="bg-white rounded-lg p-6 shadow-sm border border-slate-200">
+                <h4 class="font-semibold text-slate-800 mb-3">Top-K Sampling</h4>
+                <p class="text-sm text-slate-600 mb-2">Restricts sampling to K most likely tokens</p>
+                <div class="math-formula p-3 rounded text-center">
+                  <code class="text-sm">P(top-K) / ΣP(top-K)</code>
+                </div>
+                <ul class="text-xs text-slate-500 mt-2 space-y-1">
+                  <li>• K = 1: Greedy</li>
+                  <li>• Small K: Focused</li>
+                  <li>• Large K: Diverse</li>
+                </ul>
+              </div>
+              <div class="bg-white rounded-lg p-6 shadow-sm border border-slate-200">
+                <h4 class="font-semibold text-slate-800 mb-3">Top-P (Nucleus)</h4>
+                <p class="text-sm text-slate-600 mb-2">Selects smallest set of tokens with cumulative probability &gt; P</p>
+                <div class="math-formula p-3 rounded text-center">
+                  <code class="text-sm">min(k) s.t. ΣP(top-k) ≥ P</code>
+                </div>
+                <ul class="text-xs text-slate-500 mt-2 space-y-1">
+                  <li>• Adaptive threshold</li>
+                  <li>• More flexible than top-K</li>
+                  <li>• P = 0.9 common choice</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div class="mb-12">
+            <h3 class="serif-heading text-2xl font-semibold text-slate-800 mb-6">Optimizing Inference with KV Caching</h3>
+            <p class="text-slate-700 leading-relaxed mb-6">
+              The main bottleneck in Transformer inference is recalculating Key and Value vectors for the entire context at each generation step. KV caching avoids this redundant computation by storing and reusing K and V vectors.
+              <a href="https://pli.princeton.edu/blog/2024/alibi-flashattention-speeding-alibi-3-5x-hardware-efficient-implementation" class="citation-link">[154]</a>
+            </p>
+
+            <div class="bg-white rounded-lg p-6 shadow-sm border border-slate-200 mb-6">
+              <h4 class="font-semibold text-slate-800 mb-4">KV Cache Benefits</h4>
+              <div class="grid md:grid-cols-2 gap-6">
+                <div>
+                  <h5 class="font-semibold text-slate-700 mb-2">Without Cache</h5>
+                  <p class="text-sm text-slate-600">Time complexity: O(n²) per step</p>
+                  <p class="text-sm text-slate-600">Recomputes all K, V vectors</p>
+                </div>
+                <div>
+                  <h5 class="font-semibold text-slate-700 mb-2">With KV Cache</h5>
+                  <p class="text-sm text-slate-600">Time complexity: O(n) per step</p>
+                  <p class="text-sm text-slate-600">Stores and reuses K, V vectors</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tutorial 6: Advanced Architectures -->
+      <section id="tutorial-6" class="px-12 py-16 bg-white">
+        <div class="max-w-4xl mx-auto">
+          <h2 class="serif-heading text-4xl font-bold text-slate-900 mb-8">Tutorial 6: Advanced Model Architectures and Techniques</h2>
+
+          <div id="moe" class="mb-12">
+            <h3 class="serif-heading text-2xl font-semibold text-slate-800 mb-6">Mixture of Experts (MoE)</h3>
+            <p class="text-slate-700 leading-relaxed mb-6">
+              The Mixture of Experts architecture addresses the challenge of scaling model capacity without proportional computational cost. It replaces dense layers with multiple specialized expert networks, using a gating mechanism to route inputs to the most appropriate experts.
+              <a href="https://neptune.ai/blog/mixture-of-experts-llms" class="citation-link">[220]</a>
+            </p>
+
+            <div class="bg-white rounded-lg p-6 shadow-sm border border-slate-200 mb-6">
+              <h4 class="font-semibold text-slate-800 mb-4">Key Concepts</h4>
+              <div class="space-y-4">
+                <div>
+                  <h5 class="font-semibold text-slate-700 mb-2">Sparse Activation</h5>
+                  <p class="text-sm text-slate-600">Only a fraction of experts are activated for each input, reducing computational cost</p>
+                </div>
+                <div>
+                  <h5 class="font-semibold text-slate-700 mb-2">Gating Network</h5>
+                  <p class="text-sm text-slate-600">Learns to route inputs to the most relevant experts based on input characteristics</p>
+                </div>
+                <div>
+                  <h5 class="font-semibold text-slate-700 mb-2">Specialized Experts</h5>
+                  <p class="text-sm text-slate-600">Each expert becomes proficient in handling specific types of inputs or linguistic patterns</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="code-block rounded-lg p-4 overflow-x-auto">
+              <pre class="text-sm"><code>class MoELayer(nn.Module):
+    def __init__(self, dim, intermediate_dim, num_experts, top_k=2):
+        super().__init__()
+        self.num_experts = num_experts
+        self.top_k = top_k
+        
+        # Create a list of expert networks
+        self.experts = nn.ModuleList([
+            Expert(dim, intermediate_dim) for _ in range(num_experts)
+        ])
+        
+        # The router is a linear layer that maps hidden states to expert logits
+        self.router = nn.Linear(dim, num_experts)
+
+    def forward(self, hidden_states):
+        batch_size, seq_len, hidden_dim = hidden_states.shape
+        
+        # Compute routing probabilities
+        router_logits = self.router(hidden_states_reshaped)
+        routing_probs = F.softmax(router_logits, dim=-1)
+        
+        # Select the top-k experts and their probabilities
+        top_k_probs, top_k_indices = torch.topk(routing_probs, self.top_k, dim=-1)
+        top_k_probs = top_k_probs / top_k_probs.sum(dim=-1, keepdim=True)
+        
+        # Process through selected experts and combine outputs
+        final_output = torch.zeros_like(hidden_states_reshaped)
+        
+        for i in range(self.top_k):
+            expert_idx = top_k_indices[:, i]
+            expert_prob = top_k_probs[:, i].unsqueeze(-1)
+            
+            for j in range(self.num_experts):
+                mask = (expert_idx == j)
+                if mask.any():
+                    expert_input = hidden_states_reshaped[mask]
+                    expert_output = self.experts[j](expert_input)
+                    final_output[mask] += expert_prob[mask] * expert_output
+        
+        return final_output.view(batch_size, seq_len, hidden_dim)</code></pre>
+            </div>
+          </div>
+
+          <div id="gqa" class="mb-12">
+            <h3 class="serif-heading text-2xl font-semibold text-slate-800 mb-6">Grouped Query Attention (GQA)</h3>
+            <p class="text-slate-700 leading-relaxed mb-6">
+              Grouped Query Attention is an optimization that balances the memory efficiency of Multi-Query Attention with the expressive power of Multi-Head Attention. GQA groups query heads and shares Key and Value heads among each group.
+            </p>
+
+            <div class="bg-white rounded-lg p-6 shadow-sm border border-slate-200 mb-6">
+              <h4 class="font-semibold text-slate-800 mb-4">GGA Benefits</h4>
+              <div class="grid md:grid-cols-2 gap-6">
+                <div>
+                  <h5 class="font-semibold text-slate-700 mb-2">Memory Efficiency</h5>
+                  <p class="text-sm text-slate-600">Reduces KV cache size by sharing Key and Value heads</p>
+                </div>
+                <div>
+                  <h5 class="font-semibold text-slate-700 mb-2">Performance Balance</h5>
+                  <p class="text-sm text-slate-600">Maintains most of MHA&#39;s expressive power while improving efficiency</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="math-formula p-6 rounded-lg mb-6">
+              <h4 class="font-semibold text-slate-800 mb-3">GQA Configuration</h4>
+              <p class="text-slate-700 mb-2">For N query heads and G groups:</p>
+              <code class="text-base">Query heads per group: N/G</code>
+              <br/>
+              <code class="text-base">Key/Value heads: G</code>
+              <p class="text-sm text-slate-600 mt-2">Each K/V head shared by N/G query heads</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tutorial 7: Training and Fine-Tuning -->
+      <section id="tutorial-7" class="px-12 py-16 bg-slate-50">
+        <div class="max-w-4xl mx-auto">
+          <h2 class="serif-heading text-4xl font-bold text-slate-900 mb-8">Tutorial 7: Training and Fine-Tuning LLMs</h2>
+
+          <div class="mb-12">
+            <h3 class="serif-heading text-2xl font-semibold text-slate-800 mb-6">Pretraining Objectives</h3>
+            <p class="text-slate-700 leading-relaxed mb-6">
+              Before fine-tuning for specific tasks, LLMs must be pretrained on massive text corpora. The goal is to teach fundamental language structure through self-supervised learning.
+            </p>
+
+            <div class="grid md:grid-cols-2 gap-6 mb-6">
+              <div class="bg-white rounded-lg p-6 shadow-sm border border-slate-200">
+                <h4 class="font-semibold text-slate-800 mb-3">Causal Language Modeling (CLM)</h4>
+                <p class="text-sm text-slate-600 mb-3">Used by: GPT models</p>
+                <p class="text-sm text-slate-600">Predict next token given all previous tokens</p>
+                <div class="mt-3 p-2 bg-slate-50 rounded text-xs">
+                  <strong>Example:</strong> &#34;The cat sat on the __&#34; → &#34;mat&#34;
+                </div>
+              </div>
+              <div class="bg-white rounded-lg p-6 shadow-sm border border-slate-200">
+                <h4 class="font-semibold text-slate-800 mb-3">Masked Language Modeling (MLM)</h4>
+                <p class="text-sm text-slate-600 mb-3">Used by: BERT models</p>
+                <p class="text-sm text-slate-600">Predict masked tokens given bidirectional context</p>
+                <div class="mt-3 p-2 bg-slate-50 rounded text-xs">
+                  <strong>Example:</strong> &#34;The [MASK] sat on the mat&#34; → &#34;cat&#34;
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mb-12">
+            <h3 class="serif-heading text-2xl font-semibold text-slate-800 mb-6">Fine-Tuning Techniques</h3>
+            <p class="text-slate-700 leading-relaxed mb-6">
+              Fine-tuning adapts pretrained models to specific tasks. Modern approaches include instruction tuning and reinforcement learning from human feedback.
+            </p>
+
+            <div class="space-y-6">
+              <div class="bg-white rounded-lg p-6 shadow-sm border border-slate-200">
+                <h4 class="font-semibold text-slate-800 mb-3">Instruction Tuning</h4>
+                <p class="text-sm text-slate-600 mb-3">Trains models on instruction-response pairs to improve task following capabilities</p>
+                <div class="text-xs text-slate-500">
+                  <strong>Example:</strong> &#34;Write a poem about cats&#34; → &#34;Whiskers soft and eyes so bright...&#34;
+                </div>
+              </div>
+              <div class="bg-white rounded-lg p-6 shadow-sm border border-slate-200">
+                <h4 class="font-semibold text-slate-800 mb-3">RLHF (Reinforcement Learning from Human Feedback)</h4>
+                <p class="text-sm text-slate-600 mb-3">Three-step process using human preferences to align model behavior</p>
+                <ol class="text-xs text-slate-500 list-decimal list-inside space-y-1">
+                  <li>Train reward model on human preferences</li>
+                  <li>Use reinforcement learning to optimize policy</li>
+                  <li>Fine-tune against the reward model</li>
+                </ol>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tutorial 8: Scaling and Optimization -->
+      <section id="tutorial-8" class="px-12 py-16 bg-white">
+        <div class="max-w-4xl mx-auto">
+          <h2 class="serif-heading text-4xl font-bold text-slate-900 mb-8">Tutorial 8: Scaling Laws and Model Optimization</h2>
+
+          <div class="mb-12">
+            <h3 class="serif-heading text-2xl font-semibold text-slate-800 mb-6">Scaling Laws in LLMs</h3>
+            <p class="text-slate-700 leading-relaxed mb-6">
+              Scaling laws reveal predictable relationships between model size, training data, and performance. These empirical relationships guide resource allocation for training new models.
+            </p>
+
+            <div class="math-formula p-6 rounded-lg mb-6">
+              <h4 class="font-semibold text-slate-800 mb-3">Scaling Law Formula</h4>
+              <code class="text-lg">L(N, D) = A × N^(-α) + B × D^(-β) + E</code>
+              <div class="mt-3 text-sm text-slate-600">
+                <p><strong>Where:</strong></p>
+                <ul class="list-disc list-inside space-y-1 mt-2">
+                  <li>L = Cross-entropy loss (performance measure)</li>
+                  <li>N = Number of model parameters</li>
+                  <li>D = Training dataset size</li>
+                  <li>A, B, α, β = Empirical constants</li>
+                  <li>E = Irreducible error</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div class="mb-12">
+            <h3 class="serif-heading text-2xl font-semibold text-slate-800 mb-6">Model Quantization</h3>
+            <p class="text-slate-700 leading-relaxed mb-6">
+              Quantization reduces memory footprint and computational cost by converting high-precision parameters to lower-precision formats, enabling deployment on resource-constrained devices.
+            </p>
+
+            <div class="grid md:grid-cols-2 gap-6 mb-6">
+              <div class="bg-white rounded-lg p-6 shadow-sm border border-slate-200">
+                <h4 class="font-semibold text-slate-800 mb-3">Post-Training Quantization (PTQ)</h4>
+                <p class="text-sm text-slate-600 mb-3">Simplest approach - quantizes pretrained models without retraining</p>
+                <div class="text-xs text-slate-500">
+                  <strong>Pros:</strong> Easy to implement
+                  <br/>
+                  <strong>Cons:</strong> Can degrade performance
+                </div>
+              </div>
+              <div class="bg-white rounded-lg p-6 shadow-sm border border-slate-200">
+                <h4 class="font-semibold text-slate-800 mb-3">Quantization-Aware Training (QAT)</h4>
+                <p class="text-sm text-slate-600 mb-3">Simulates quantization during training for better performance</p>
+                <div class="text-xs text-slate-500">
+                  <strong>Pros:</strong> Better performance retention
+                  <br/>
+                  <strong>Cons:</strong> Requires retraining
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mb-12">
+            <h3 class="serif-heading text-2xl font-semibold text-slate-800 mb-6">Training and Inference Stacks</h3>
+            <p class="text-slate-700 leading-relaxed mb-6">
+              Specialized software stacks enable efficient training and deployment of large language models through distributed computing and optimization techniques.
+            </p>
+
+            <div class="space-y-6">
+              <div class="bg-white rounded-lg p-6 shadow-sm border border-slate-200">
+                <h4 class="font-semibold text-slate-800 mb-3">DeepSpeed</h4>
+                <p class="text-sm text-slate-600 mb-3">Training optimization library with:</p>
+                <ul class="text-xs text-slate-500 list-disc list-inside space-y-1">
+                  <li>ZeRO (Zero Redundancy Optimizer)</li>
+                  <li>Pipeline parallelism</li>
+                  <li>Mixed precision training</li>
+                </ul>
+              </div>
+              <div class="bg-white rounded-lg p-6 shadow-sm border border-slate-200">
+                <h4 class="font-semibold text-slate-800 mb-3">vLLM</h4>
+                <p class="text-sm text-slate-600 mb-3">High-throughput inference engine featuring:</p>
+                <ul class="text-xs text-slate-500 list-disc list-inside space-y-1">
+                  <li>PagedAttention algorithm</li>
+                  <li>Continuous batching</li>
+                  <li>Quantization support</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <script>
+        // Table of Contents scrolling behavior
+        document.addEventListener('DOMContentLoaded', function() {
+            const tocLinks = document.querySelectorAll('.toc-link');
+            const sections = document.querySelectorAll('section[id]');
+            
+            // Update active section on scroll
+            window.addEventListener('scroll', function() {
+                let current = '';
+                sections.forEach(section => {
+                    const sectionTop = section.offsetTop;
+                    const sectionHeight = section.clientHeight;
+                    if (window.pageYOffset >= sectionTop - 200) {
+                        current = section.getAttribute('id');
+                    }
+                });
+                
+                tocLinks.forEach(link => {
+                    link.classList.remove('active');
+                    if (link.getAttribute('href').substring(1) === current) {
+                        link.classList.add('active');
+                    }
+                });
+            });
+            
+            // Smooth scrolling for TOC links
+            tocLinks.forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const targetId = this.getAttribute('href').substring(1);
+                    const targetSection = document.getElementById(targetId);
+                    if (targetSection) {
+                        targetSection.scrollIntoView({
+                            behavior: 'smooth',
+                            block: 'start'
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+  
+
+</body></html>
